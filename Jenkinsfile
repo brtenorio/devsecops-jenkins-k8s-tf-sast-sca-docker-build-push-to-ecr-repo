@@ -3,30 +3,25 @@ pipeline {
   tools { 
     maven 'Maven_3_8_4'  
   }
-  stages {
-    stage('Build') {
-      steps {
-        script {
-          // Build image with registry/repo:tag so it can be pushed later
-          app = docker.build("${registry}/${repo}:${tag}")
-        }
-      }
+  stage('Build') { 
+            steps { 
+               withDockerRegistry([credentialsId: "dockerlogin", url: ""]) {
+                 script{
+                 app =  docker.build("asg")
+                 }
+               }
+            }
     }
 
-    stage('Push') {
-      steps {
-        script {
-          // Option A: Login to ECR with AWS CLI (recommended if aws-cli is available on agent)
-          sh "aws ecr get-login-password --region us-east-1ß | docker login --username AWS --password-stdin ${registry}"
-          app.push()
-
-          // Option B: If you have configured a Jenkins credential / ECR credential helper,
-          // uncomment and use docker.withRegistry instead of the aws-cli login above:
-          // docker.withRegistry("https://${registry}", 'ecr:us-west-2:aws-credentials') {
-          //   app.push()
-          // }
-        }
-      }
-    }
+	stage('Push') {
+            steps {
+                script{
+                    docker.withRegistry('https://555977951959.dkr.ecr.us-east-1.amazonaws.com', 'ecr:us-east-1:aws-credentials') {
+                    app.push("latest")
+                    }
+                }
+            }
+    	}
+	    
   }
 }
