@@ -17,7 +17,7 @@ pipeline {
       steps {
         script {
           // Option A: Login to ECR with AWS CLI (recommended if aws-cli is available on agent)
-          sh "aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin ${registry}"
+          sh "aws ecr get-login-password --region us-east-1ß | docker login --username AWS --password-stdin ${registry}"
           app.push()
 
           // Option B: If you have configured a Jenkins credential / ECR credential helper,
