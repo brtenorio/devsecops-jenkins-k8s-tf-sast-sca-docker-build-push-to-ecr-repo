@@ -1,38 +1,58 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: asgbuggy-deployment
+  name: flask-app-deployment
+  labels:
+    app: flask-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: asgbuggy
+      app: flask-app
   template:
     metadata:
       labels:
-        app: asgbuggy
+        app: flask-app
     spec:
       containers:
-      - name: asgbuggy
-        image: 145988340565.dkr.ecr.us-west-2.amazonaws.com/asg
-        imagePullPolicy: Always
+      - name: flask-app
+        # update to the ECR image you actually push from Jenkins (region and account)
+        image: 555977951959.dkr.ecr.us-east-1.amazonaws.com/flask-app:latest
+        imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8080
-# service type loadbalancer       
+        - containerPort: 5000
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
 ---
 apiVersion: v1
 kind: Service
 metadata:
+  name: flask-app
   labels:
-    app: asgbuggy
-    k8s-app: asgbuggy
-  name: asgbuggy
+    app: flask-app
 spec:
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 8080
   type: LoadBalancer
   selector:
-    app: asgbuggy
+    app: flask-app
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 5000
