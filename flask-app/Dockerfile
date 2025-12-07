@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
 
 ENV PYTHONUNBUFFERED=1
-EXPOSE 5000
+EXPOSE 5010
 
 # adjust the WSGI module/path if your app entrypoint differs (e.g. app:app)
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "3"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5010", "app:app", "--workers", "3"]
