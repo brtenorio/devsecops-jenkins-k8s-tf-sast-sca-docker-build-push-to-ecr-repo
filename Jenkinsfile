@@ -25,11 +25,6 @@ pipeline {
           // Recommended: login to ECR with AWS CLI on the agent
           sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${registry}"
           app.push()
-
-          // Alternative (if you have a working Jenkins credential for ECR):
-          // docker.withRegistry("https://${registry}", 'ecr:us-east-1:aws-credentials') {
-          //   app.push()
-          // }
         }
       }
     }
@@ -44,8 +39,9 @@ pipeline {
           // configure kubeconfig for the EKS cluster (cluster name must match your eksctl create cluster)
           sh "aws eks update-kubeconfig --name kubernetes-cluster --region ${env.AWS_REGION}"
 
-          // update the deployment image to the newly pushed image and wait for rollout
+          // apply the provided deployment.yaml from the repo and ensure the image is set to the just-pushed image
           sh """
+            kubectl apply -f deployment.yaml
             kubectl set image deployment/flask-app-deployment flask-app=${registry}/${repo}:${tag} --record
             kubectl rollout status deployment/flask-app-deployment --timeout=120s
           """
