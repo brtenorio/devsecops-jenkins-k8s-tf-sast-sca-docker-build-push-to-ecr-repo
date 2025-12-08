@@ -44,7 +44,7 @@ pipeline {
             sh 'kubectl --kubeconfig=$KUBECONFIG apply -f deployment.yaml -n flaskapp'
             sh 'kubectl --kubeconfig=$KUBECONFIG set image deployment/flask-app-deployment flask-app=' + image + ' -n flaskapp'
             try {
-              sh 'kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app-deployment --timeout=900s -n flaskapp'
+              sh 'kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app-deployment -n flaskapp'
             } catch (err) {
               // collect useful debug info (pods, describe, logs) without revealing secret in logs
               sh 'echo "=== PODS ==="; kubectl --kubeconfig=$KUBECONFIG get pods -n flaskapp -o wide || true'
