@@ -41,9 +41,10 @@ pipeline {
 
           // apply the provided deployment.yaml from the repo and ensure the image is set to the just-pushed image
           sh """
-            kubectl apply -f deployment.yaml
-            kubectl set image deployment/flask-app-deployment flask-app=${registry}/${repo}:${tag} --record
-            kubectl rollout status deployment/flask-app-deployment --timeout=120s
+            kubectl delete all --all -n flaskapp || true
+            kubectl apply -f deployment.yaml -n flaskapp
+            kubectl set image deployment/flask-app-deployment flask-app=${registry}/${repo}:${tag} --record -n flaskapp
+            kubectl rollout status deployment/flask-app-deployment --timeout=120s -n flaskapp
           """
         }
       }
