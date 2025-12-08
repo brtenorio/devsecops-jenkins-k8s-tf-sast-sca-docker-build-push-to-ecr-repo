@@ -35,17 +35,15 @@ pipeline {
       }
       steps {
         script {
-          // prerequisites on the agent: aws-cli, kubectl, and IAM user/role able to access the EKS cluster
-          // configure kubeconfig for the EKS cluster (cluster name must match your eksctl create cluster)
-          sh "aws eks update-kubeconfig --name kubernetes-cluster --region ${env.AWS_REGION}"
-
-          // apply the provided deployment.yaml from the repo and ensure the image is set to the just-pushed image
-          sh """
-            kubectl delete all --all -n flaskapp || true
-            kubectl apply -f deployment.yaml -n flaskapp
-            kubectl set image deployment/flask-app-deployment flask-app=${registry}/${repo}:${tag} --record -n flaskapp
-            kubectl rollout status deployment/flask-app-deployment --timeout=120s -n flaskapp
-          """
+          // use stored kubeconfig credential (credentialId: 'kubelogin') to run kubectl
+          // ensure the Jenkins credential 'kubelogin' is of type "File" containing a kubeconfig
+          withCredentials([file(credentialsId: 'kubelogin', variable: 'KUBECONFIG')]) {
+            sh """
+              kubectl --kubeconfig=${KUBECONFIG} apply -f deployment.yaml -n flaskapp
+              kubectl --kubeconfig=${KUBECONFIG} set image deployment/flask-app-deployment flask-app=${registry}/${repo}:${tag} --record -n flaskapp
+              kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/flask-app-deployment --timeout=120s -n flaskapp
+            """
+          }
         }
       }
     }
