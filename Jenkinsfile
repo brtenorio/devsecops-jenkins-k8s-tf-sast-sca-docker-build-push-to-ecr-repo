@@ -32,18 +32,27 @@ pipeline {
 
     stage('Deploy') {
       when {
-        expression { return env.DEPLOY == 'true' } // optional gate; set DEPLOY=true to deploy
+        expression { return env.DEPLOY == 'true' }
       }
       steps {
         script {
+          def image = "${registry}/${repo}:${tag}"
           // use stored kubeconfig credential (credentialId: 'kubelogin') to run kubectl
-          // ensure the Jenkins credential 'kubelogin' is of type "File" containing a kubeconfig
+          // ensure 'kubelogin' is a File credential containing kubeconfig
           withCredentials([file(credentialsId: 'kubelogin', variable: 'KUBECONFIG')]) {
-            sh """
-              kubectl --kubeconfig=${KUBECONFIG} apply -f deployment.yaml -n flaskapp
-              kubectl --kubeconfig=${KUBECONFIG} set image deployment/flask-app-deployment flask-app=${registry}/${repo}:${tag} --record -n flaskapp
-              kubectl --kubeconfig=${KUBECONFIG} rollout status deployment/flask-app-deployment --timeout=120s -n flaskapp
-            """
+            // avoid Groovy interpolation of the secret by using single-quoted script strings
+            sh 'kubectl --kubeconfig=$KUBECONFIG apply -f deployment.yaml -n flaskapp'
+            sh 'kubectl --kubeconfig=$KUBECONFIG set image deployment/flask-app-deployment flask-app=' + image + ' -n flaskapp'
+            try {
+              sh 'kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app-deployment --timeout=180s -n flaskapp'
+            } catch (err) {
+              // collect useful debug info (pods, describe, logs) without revealing secret in logs
+              sh 'echo "=== PODS ==="; kubectl --kubeconfig=$KUBECONFIG get pods -n flaskapp -o wide || true'
+              sh 'echo "=== EVENTS ==="; kubectl --kubeconfig=$KUBECONFIG get events -n flaskapp --sort-by=.metadata.creationTimestamp || true'
+              sh 'echo "=== DESCRIBE PODS ==="; for p in $(kubectl --kubeconfig=$KUBECONFIG get pods -n flaskapp -o name); do kubectl --kubeconfig=$KUBECONFIG describe $p -n flaskapp || true; done'
+              sh 'echo "=== CONTAINER LOGS (first pod) ==="; POD=$(kubectl --kubeconfig=$KUBECONFIG get pods -n flaskapp -o jsonpath="{.items[0].metadata.name}"); kubectl --kubeconfig=$KUBECONFIG logs -n flaskapp $POD || true'
+              error "Deployment rollout failed: ${err}"
+            }
           }
         }
       }
