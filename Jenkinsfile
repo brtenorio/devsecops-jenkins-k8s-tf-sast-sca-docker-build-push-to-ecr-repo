@@ -41,13 +41,21 @@ pipeline {
           // ensure 'kubelogin' is a File credential containing kubeconfig
           withCredentials([file(credentialsId: 'kubelogin', variable: 'KUBECONFIG')]) {
             try {
-              // ensure image exists in ECR before applying deployment
+              // verify image exists in ECR
               sh 'if ! aws ecr describe-images --repository-name ' + repo + ' --image-ids imageTag=' + tag + ' --region ' + env.AWS_REGION + ' >/dev/null 2>&1; then echo "Image not found in ECR: ' + registry + '/' + repo + ':' + tag + '"; aws ecr list-images --repository-name ' + repo + ' --region ' + env.AWS_REGION + ' || true; exit 1; fi'
-              // apply manifest and update image; avoid Groovy interpolation of KUBECONFIG by using single-quoted sh strings
-              sh 'kubectl --kubeconfig=$KUBECONFIG apply -f deployment.yaml -n flaskapp'
+
+              // patch deployment.yaml on-the-fly so probes/ports match the container (container listens on 5010)
+              sh '''
+                cp deployment.yaml deployment.apply.yaml
+                sed -i.bak 's/containerPort: 5000/containerPort: 5010/g' deployment.apply.yaml || true
+                sed -i.bak 's/port: 5000/port: 5010/g' deployment.apply.yaml || true
+                sed -i.bak 's/targetPort: 5000/targetPort: 5010/g' deployment.apply.yaml || true
+                kubectl --kubeconfig=$KUBECONFIG apply -f deployment.apply.yaml -n flaskapp
+              '''
+
+              // set image and wait for rollout (use Groovy concatenation for image to avoid interpolating KUBECONFIG)
               sh 'kubectl --kubeconfig=$KUBECONFIG set image deployment/flask-app-deployment flask-app=' + image + ' -n flaskapp'
-              // wait for rollout (extended timeout)
-              sh 'kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app-deployment --timeout=600s -n flaskapp'
+              sh 'kubectl --kubeconfig=$KUBECONFIG rollout status deployment/flask-app-deployment --timeout=900s -n flaskapp'
             } catch (err) {
               // collect diagnostics without exposing the kubeconfig content
               sh 'echo "=== DEPLOYMENT ==="; kubectl --kubeconfig=$KUBECONFIG describe deployment/flask-app-deployment -n flaskapp || true'
